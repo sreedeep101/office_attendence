@@ -8,7 +8,14 @@ app.use(express.json());
 
 const authRoutes = require("./routes/auth");
 const employeeRoutes = require("./routes/employee");
+const attendanceRoutes = require("./routes/attendance");
+const reportRoutes = require("./routes/report");
+const leaveRoutes = require("./routes/leave");
 
+
+app.use("/api/leave", leaveRoutes);
+app.use("/api/reports", reportRoutes);
+app.use("/api/attendance", attendanceRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/employees", employeeRoutes);
 app.use("/uploads", express.static("uploads"));

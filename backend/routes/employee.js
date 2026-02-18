@@ -3,6 +3,7 @@ const db = require("../db");
 const bcrypt = require("bcryptjs");
 const multer = require("multer");
 const path = require("path");
+const { verifyToken, verifyAdmin } = require("../middleware/authMiddleware");
 
 const router = express.Router();
 const storage = multer.diskStorage({
@@ -15,12 +16,12 @@ const storage = multer.diskStorage({
 const upload = multer({ storage });
 
 /* ADMIN DASHBOARD STATS */
-router.get("/stats", (req, res) => {
+router.get("/stats", verifyToken, verifyAdmin, (req, res) => {
 
   const totalEmployeesQuery = "SELECT COUNT(*) AS total FROM users WHERE role='employee'";
 
   const presentTodayQuery = `
-    SELECT COUNT(DISTINCT employee_id) AS present
+    SELECT COUNT(DISTINCT user_id) AS present
     FROM attendance_sessions
     WHERE DATE(check_in) = CURDATE()
   `;
@@ -45,7 +46,7 @@ router.get("/stats", (req, res) => {
 });
 
 /* ADD EMPLOYEE */
-router.post("/add", upload.single("profile_image"), async (req, res) => {
+router.post("/add", upload.single("profile_image"), verifyToken, verifyAdmin, async (req, res) => {
   const { name, email, phone, position } = req.body;
 
   try {
@@ -73,7 +74,7 @@ router.post("/add", upload.single("profile_image"), async (req, res) => {
 
 
 /* edit EMPLOYEE */
-router.put("/edit/:id", upload.single("profile_image"), (req, res) => {
+router.put("/edit/:id", upload.single("profile_image"), verifyToken, verifyAdmin, (req, res) => {
   const { name, email, phone, position } = req.body;
   const id = req.params.id;
 
@@ -106,8 +107,8 @@ router.put("/edit/:id", upload.single("profile_image"), (req, res) => {
 
 
 /* GET ALL EMPLOYEES */
-router.get("/", (req, res) => {
-  const sql = "SELECT id, name, email, phone, position FROM users WHERE role='employee'";
+router.get("/", verifyToken, verifyAdmin, (req, res) => {
+  const sql = "SELECT id, name, email, phone, position, profile_image FROM users WHERE role='employee'";
 
   db.query(sql, (err, results) => {
     if (err) return res.status(500).json(err);
@@ -115,6 +116,49 @@ router.get("/", (req, res) => {
     res.json(results);
   });
 });
+
+/* attendance percentage of EMPLOYEE */
+router.get("/profile/:id", verifyToken, verifyAdmin, (req, res) => {
+  const id = req.params.id;
+
+  const employeeQuery = "SELECT * FROM users WHERE id = ?";
+
+  const attendanceQuery = `
+    SELECT COUNT(DISTINCT DATE(check_in)) AS present_days
+    FROM attendance_sessions
+    WHERE user_id = ?
+    AND check_in >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+  `;
+
+  db.query(employeeQuery, [id], (err, empResult) => {
+    if (err) return res.status(500).json(err);
+    if (empResult.length === 0) return res.status(404).json({ message: "Not found" });
+
+    db.query(attendanceQuery, [id], (err, attendanceResult) => {
+      if (err) return res.status(500).json(err);
+
+      const presentDays = attendanceResult[0].present_days;
+      const totalDays = 30; // simplified working period
+      const percentage = ((presentDays / totalDays) * 100).toFixed(2);
+
+      res.json({
+        employee: empResult[0],
+        attendancePercentage: percentage
+      });
+    });
+  });
+});
+
+/* DELETE EMPLOYEE */
+router.delete("/delete/:id", verifyToken, verifyAdmin, (req, res) => {
+  const id = req.params.id;
+
+  db.query("DELETE FROM users WHERE id=?", [id], (err) => {
+    if (err) return res.status(500).json(err);
+    res.json({ message: "Employee deleted successfully" });
+  });
+});
+
 
 
 module.exports = router;

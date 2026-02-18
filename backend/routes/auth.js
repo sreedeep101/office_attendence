@@ -27,6 +27,7 @@ router.post("/login", (req, res) => {
     res.json({
       token,
       role: user.role,
+      id: user.id,
       name: user.name,
     });
   });
