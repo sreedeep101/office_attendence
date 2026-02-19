@@ -81,6 +81,24 @@ router.put("/admin/update/:id", verifyToken, verifyAdmin, (req, res) => {
   );
 });
 
+//employee leave stats for dashboard
+router.get("/employee/stats/:id", verifyToken, verifyEmployee, (req, res) => {
+  const id = req.params.id;
+
+  const query = `
+    SELECT status, COUNT(*) as count
+    FROM leave_requests
+    WHERE user_id = ?
+    GROUP BY status
+  `;
+
+  db.query(query, [id], (err, results) => {
+    if (err) return res.status(500).json(err);
+    res.json(results);
+  });
+});
+
+
 
 module.exports = router;
 

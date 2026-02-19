@@ -224,6 +224,55 @@ router.get("/admin/monthly-hours", verifyToken, verifyAdmin, (req, res) => {
   });
 });
 
+//log of attendance sessions
+router.get("/logs/:employee_id", verifyToken, verifyEmployee, (req, res) => {
+  const id = req.params.employee_id;
+
+  const query = `
+    SELECT 
+      IF(check_out IS NULL, 'Check In', 'Check Out') as type,
+      TIME(check_in) as time,
+      'Downtown Office' as note
+    FROM attendance_sessions
+    WHERE user_id = ?
+    AND DATE(check_in) = CURDATE()
+    ORDER BY check_in DESC
+  `;
+
+  db.query(query, [id], (err, results) => {
+    if (err) return res.status(500).json(err);
+    res.json(results);
+  });
+});
+
+//employee mothly attendance
+router.get("/employee/monthly/:id", verifyToken, verifyEmployee, (req, res) => {
+  const id = req.params.id;
+
+  const query = `
+    SELECT 
+      DAY(check_in) as day,
+      SUM(TIMESTAMPDIFF(MINUTE, check_in, check_out)) as total_minutes
+    FROM attendance_sessions
+    WHERE user_id = ?
+    AND MONTH(check_in) = MONTH(CURDATE())
+    AND YEAR(check_in) = YEAR(CURDATE())
+    AND check_out IS NOT NULL
+    GROUP BY DAY(check_in)
+    ORDER BY DAY(check_in)
+  `;
+
+  db.query(query, [id], (err, results) => {
+    if (err) return res.status(500).json(err);
+
+    const formatted = results.map(r => ({
+      day: r.day,
+      hours: (r.total_minutes || 0) / 60
+    }));
+
+    res.json(formatted);
+  });
+});
 
 
 

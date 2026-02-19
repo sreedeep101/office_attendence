@@ -46,7 +46,7 @@ router.get("/stats", verifyToken, verifyAdmin, (req, res) => {
 });
 
 /* ADD EMPLOYEE */
-router.post("/add", upload.single("profile_image"), verifyToken, verifyAdmin, async (req, res) => {
+router.post("/add", verifyToken, verifyAdmin, upload.single("profile_image"), async (req, res) => {
   const { name, email, phone, position } = req.body;
 
   try {
@@ -74,7 +74,7 @@ router.post("/add", upload.single("profile_image"), verifyToken, verifyAdmin, as
 
 
 /* edit EMPLOYEE */
-router.put("/edit/:id", upload.single("profile_image"), verifyToken, verifyAdmin, (req, res) => {
+router.put("/edit/:id", verifyToken, verifyAdmin,upload.single("profile_image"), (req, res) => {
   const { name, email, phone, position } = req.body;
   const id = req.params.id;
 
@@ -118,7 +118,7 @@ router.get("/", verifyToken, verifyAdmin, (req, res) => {
 });
 
 /* attendance percentage of EMPLOYEE */
-router.get("/profile/:id", verifyToken, verifyAdmin, (req, res) => {
+router.get("/profile/:id", (req, res) => {
   const id = req.params.id;
 
   const employeeQuery = "SELECT * FROM users WHERE id = ?";
@@ -156,6 +156,34 @@ router.delete("/delete/:id", verifyToken, verifyAdmin, (req, res) => {
   db.query("DELETE FROM users WHERE id=?", [id], (err) => {
     if (err) return res.status(500).json(err);
     res.json({ message: "Employee deleted successfully" });
+  });
+});
+
+
+// UPDATE PROFILE IMAGE
+
+router.put("/profile-image/:id", verifyToken, upload.single("profile_image"), (req, res) => {
+  const id = req.params.id;
+
+  if (!req.file) {
+    return res.status(400).json({ message: "No file uploaded" });
+  }
+
+  const imagePath = req.file.filename;
+
+  const query = `
+    UPDATE users
+    SET profile_image = ?
+    WHERE id = ?
+  `;
+
+  db.query(query, [imagePath, id], (err) => {
+    if (err) return res.status(500).json(err);
+
+    res.json({
+      message: "Profile image updated",
+      image: imagePath
+    });
   });
 });
 
