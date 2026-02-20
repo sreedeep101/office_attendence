@@ -74,37 +74,85 @@ router.post("/add", verifyToken, verifyAdmin, upload.single("profile_image"), as
 
 
 /* edit EMPLOYEE */
-router.put("/edit/:id", verifyToken, verifyAdmin,upload.single("profile_image"), (req, res) => {
-  const { name, email, phone, position } = req.body;
-  const id = req.params.id;
+// router.put("/edit/:id", verifyToken, verifyAdmin,upload.single("profile_image"), (req, res) => {
+//   const { name, email, phone, position } = req.body;
+//   const id = req.params.id;
 
-  const imagePath = req.file ? req.file.filename : null;
+//   const imagePath = req.file ? req.file.filename : null;
 
-  let sql;
-  let values;
+//   let sql;
+//   let values;
 
-  if (imagePath) {
-    sql = `
-      UPDATE users
-      SET name=?, email=?, phone=?, position=?, profile_image=? 
-      WHERE id=?
-    `;
-    values = [name, email, phone, position, imagePath, id];
-  } else {
-    sql = `
-      UPDATE users 
-      SET name=?, email=?, phone=?, position=? 
-      WHERE id=?
-    `;
-    values = [name, email, phone, position, id];
+//   if (imagePath) {
+//     sql = `
+//       UPDATE users
+//       SET name=?, email=?, phone=?, position=?, profile_image=? 
+//       WHERE id=?
+//     `;
+//     values = [name, email, phone, position, imagePath, id];
+//   } else {
+//     sql = `
+//       UPDATE users 
+//       SET name=?, email=?, phone=?, position=? 
+//       WHERE id=?
+//     `;
+//     values = [name, email, phone, position, id];
+//   }
+
+//   db.query(sql, values, (err, result) => {
+//     if (err) return res.status(500).json(err);
+//     res.json({ message: "Employee updated successfully" });
+//   });
+// });
+
+
+// for future update  
+
+ router.put(
+  "/edit/:id",
+  verifyToken,
+  verifyAdmin,
+  upload.single("profile_image"),
+  async (req, res) => {
+
+    const { name, email, phone, position } = req.body;
+    const id = req.params.id;
+
+    try {
+      // Hash new phone number as password
+      const hashedPassword = await bcrypt.hash(phone, 10);
+
+      const imagePath = req.file ? req.file.filename : null;
+
+      let sql;
+      let values;
+
+      if (imagePath) {
+        sql = `
+          UPDATE users
+          SET name=?, email=?, phone=?, position=?, password=?, profile_image=?
+          WHERE id=?
+        `;
+        values = [name, email, phone, position, hashedPassword, imagePath, id];
+      } else {
+        sql = `
+          UPDATE users
+          SET name=?, email=?, phone=?, position=?, password=?
+          WHERE id=?
+        `;
+        values = [name, email, phone, position, hashedPassword, id];
+      }
+
+      db.query(sql, values, (err) => {
+        if (err) return res.status(500).json(err);
+        res.json({ message: "Employee updated successfully" });
+      });
+
+    } catch (error) {
+      res.status(500).json(error);
+    }
   }
-
-  db.query(sql, values, (err, result) => {
-    if (err) return res.status(500).json(err);
-    res.json({ message: "Employee updated successfully" });
-  });
-});
-
+);
 
 /* GET ALL EMPLOYEES */
 router.get("/", verifyToken, verifyAdmin, (req, res) => {

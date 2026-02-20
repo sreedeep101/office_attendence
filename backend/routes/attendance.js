@@ -3,6 +3,7 @@ const db = require("../db");
 const geolib = require("geolib");
 const { verifyToken, verifyEmployee, verifyAdmin } = require("../middleware/authMiddleware");
 const router = express.Router();
+const checkTime = require("../middleware/timeMiddleware");
 
 
 /* attnendance stats */
@@ -28,8 +29,22 @@ router.get("/status/:employee_id", verifyToken, verifyEmployee, (req, res) => {
 
 
 /* CHECK-IN */
-router.post("/checkin", verifyToken, verifyEmployee, (req, res) => {
+router.post("/checkin", verifyToken, verifyEmployee,checkTime, (req, res) => {
     const { employee_id, lat, lng } = req.body;
+
+    const isWithinOfficeTime = () => {
+  const now = new Date();
+
+  const currentHour = now.getHours(); // 0–23
+
+  return currentHour >= 8 && currentHour < 19;
+};
+
+if (!isWithinOfficeTime()) {
+  return res.status(403).json({
+    message: "Attendance allowed only between 8:00 AM and 7:00 PM"
+  });
+}
 
     if (!lat || !lng) {
         return res.status(400).json({ message: "Location required" });
@@ -82,8 +97,16 @@ router.post("/checkin", verifyToken, verifyEmployee, (req, res) => {
 
 
 /* CHECK-OUT */
-router.post("/checkout", verifyToken, verifyEmployee, (req, res) => {
+router.post("/checkout", verifyToken, verifyEmployee, checkTime, (req, res) => {
     const { employee_id } = req.body;
+
+    const isWithinOfficeTime = () => {
+  const now = new Date();
+
+  const currentHour = now.getHours(); // 0–23
+
+  return currentHour >= 8 && currentHour < 19;
+};
 
     const findOpenSession = `
     SELECT * FROM attendance_sessions
@@ -110,6 +133,28 @@ router.post("/checkout", verifyToken, verifyEmployee, (req, res) => {
     });
 });
 
+router.post("/validate-location", verifyToken, (req, res) => {
+  const { lat, lng } = req.body;
+
+  const officeLat = 12.9716; // your office
+  const officeLng = 77.5946;
+
+  const distance = getDistance(lat, lng, officeLat, officeLng);
+
+  if (distance > 400) {
+    // auto checkout logic
+    db.query(
+      "UPDATE attendance_sessions SET check_out = NOW() WHERE employee_id=? AND check_out IS NULL",
+      [req.body.employee_id]
+    );
+
+    return res.status(403).json({
+      message: "Outside office radius"
+    });
+  }
+
+  res.json({ message: "Within radius" });
+});
 
 /*work time calculation*/
 router.get("/today/:employee_id", verifyToken, verifyEmployee, (req, res) => {
