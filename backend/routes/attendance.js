@@ -68,6 +68,34 @@ if (!isWithinOfficeTime()) {
             distance: distance
         });
     }
+    const lastSessionQuery = `
+  SELECT check_out 
+  FROM attendance_sessions 
+  WHERE user_id = ? 
+  ORDER BY check_out DESC 
+  LIMIT 1
+`;
+
+db.query(lastSessionQuery, [employee_id], (err, results) => {
+  let breakMinutes = 0;
+
+  if (results.length > 0 && results[0].check_out) {
+    const lastCheckout = new Date(results[0].check_out);
+    const now = new Date();
+
+    breakMinutes = Math.floor((now - lastCheckout) / 60000);
+  }
+
+  const insertQuery = `
+    INSERT INTO attendance_sessions 
+    (user_id, check_in, break_minutes)
+    VALUES (?, NOW(), ?)
+  `;
+
+  db.query(insertQuery, [employee_id, breakMinutes], (err) => {
+    if (err) return res.status(500).json(err);
+  });
+});
 
     const checkOpenSession = `
     SELECT * FROM attendance_sessions
@@ -319,6 +347,26 @@ router.get("/employee/monthly/:id", verifyToken, verifyEmployee, (req, res) => {
   });
 });
 
+router.get("/history/:id", verifyToken, verifyEmployee, (req, res) => {
+  const id = req.params.id;
 
+  const query = `
+    SELECT 
+      DATE(check_in) as date,
+      SUM(TIMESTAMPDIFF(MINUTE, check_in, check_out)) as total_work_minutes,
+      SUM(break_minutes) as total_break_minutes
+    FROM attendance_sessions
+    WHERE user_id = ?
+      AND check_out IS NOT NULL
+    GROUP BY DATE(check_in)
+    ORDER BY DATE(check_in) DESC
+  `;
+
+  db.query(query, [id], (err, results) => {
+    if (err) return res.status(500).json(err);
+
+    res.json(results);
+  });
+});
 
 module.exports = router;

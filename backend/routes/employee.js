@@ -3,7 +3,7 @@ const db = require("../db");
 const bcrypt = require("bcryptjs");
 const multer = require("multer");
 const path = require("path");
-const { verifyToken, verifyAdmin } = require("../middleware/authMiddleware");
+const { verifyToken, verifyAdmin , verifyEmployee } = require("../middleware/authMiddleware");
 
 const router = express.Router();
 const storage = multer.diskStorage({
@@ -74,85 +74,85 @@ router.post("/add", verifyToken, verifyAdmin, upload.single("profile_image"), as
 
 
 /* edit EMPLOYEE */
-// router.put("/edit/:id", verifyToken, verifyAdmin,upload.single("profile_image"), (req, res) => {
-//   const { name, email, phone, position } = req.body;
-//   const id = req.params.id;
+router.put("/edit/:id", verifyToken, verifyAdmin,upload.single("profile_image"), (req, res) => {
+  const { name, email, phone, position } = req.body;
+  const id = req.params.id;
 
-//   const imagePath = req.file ? req.file.filename : null;
+  const imagePath = req.file ? req.file.filename : null;
 
-//   let sql;
-//   let values;
+  let sql;
+  let values;
 
-//   if (imagePath) {
-//     sql = `
-//       UPDATE users
-//       SET name=?, email=?, phone=?, position=?, profile_image=? 
-//       WHERE id=?
-//     `;
-//     values = [name, email, phone, position, imagePath, id];
-//   } else {
-//     sql = `
-//       UPDATE users 
-//       SET name=?, email=?, phone=?, position=? 
-//       WHERE id=?
-//     `;
-//     values = [name, email, phone, position, id];
-//   }
+  if (imagePath) {
+    sql = `
+      UPDATE users
+      SET name=?, email=?, phone=?, position=?, profile_image=? 
+      WHERE id=?
+    `;
+    values = [name, email, phone, position, imagePath, id];
+  } else {
+    sql = `
+      UPDATE users 
+      SET name=?, email=?, phone=?, position=? 
+      WHERE id=?
+    `;
+    values = [name, email, phone, position, id];
+  }
 
-//   db.query(sql, values, (err, result) => {
-//     if (err) return res.status(500).json(err);
-//     res.json({ message: "Employee updated successfully" });
-//   });
-// });
+  db.query(sql, values, (err, result) => {
+    if (err) return res.status(500).json(err);
+    res.json({ message: "Employee updated successfully" });
+  });
+});
 
 
 // for future update  
 
- router.put(
-  "/edit/:id",
-  verifyToken,
-  verifyAdmin,
-  upload.single("profile_image"),
-  async (req, res) => {
+//  router.put(
+//   "/edit/:id",
+//   verifyToken,
+//   verifyAdmin,
+//   upload.single("profile_image"),
+//   async (req, res) => {
 
-    const { name, email, phone, position } = req.body;
-    const id = req.params.id;
+//     const { name, email, phone, position } = req.body;
+//     const id = req.params.id;
 
-    try {
-      // Hash new phone number as password
-      const hashedPassword = await bcrypt.hash(phone, 10);
+//     try {
+//       // Hash new phone number as password
+//       const hashedPassword = await bcrypt.hash(phone, 10);
 
-      const imagePath = req.file ? req.file.filename : null;
+//       const imagePath = req.file ? req.file.filename : null;
 
-      let sql;
-      let values;
+//       let sql;
+//       let values;
 
-      if (imagePath) {
-        sql = `
-          UPDATE users
-          SET name=?, email=?, phone=?, position=?, password=?, profile_image=?
-          WHERE id=?
-        `;
-        values = [name, email, phone, position, hashedPassword, imagePath, id];
-      } else {
-        sql = `
-          UPDATE users
-          SET name=?, email=?, phone=?, position=?, password=?
-          WHERE id=?
-        `;
-        values = [name, email, phone, position, hashedPassword, id];
-      }
+//       if (imagePath) {
+//         sql = `
+//           UPDATE users
+//           SET name=?, email=?, phone=?, position=?, password=?, profile_image=?
+//           WHERE id=?
+//         `;
+//         values = [name, email, phone, position, hashedPassword, imagePath, id];
+//       } else {
+//         sql = `
+//           UPDATE users
+//           SET name=?, email=?, phone=?, position=?, password=?
+//           WHERE id=?
+//         `;
+//         values = [name, email, phone, position, hashedPassword, id];
+//       }
 
-      db.query(sql, values, (err) => {
-        if (err) return res.status(500).json(err);
-        res.json({ message: "Employee updated successfully" });
-      });
+//       db.query(sql, values, (err) => {
+//         if (err) return res.status(500).json(err);
+//         res.json({ message: "Employee updated successfully" });
+//       });
 
-    } catch (error) {
-      res.status(500).json(error);
-    }
-  }
-);
+//     } catch (error) {
+//       res.status(500).json(error);
+//     }
+//   }
+// );
 
 /* GET ALL EMPLOYEES */
 router.get("/", verifyToken, verifyAdmin, (req, res) => {
@@ -235,6 +235,57 @@ router.put("/profile-image/:id", verifyToken, upload.single("profile_image"), (r
   });
 });
 
+//change password for employee
+router.put("/change-password/:id", verifyToken, verifyEmployee, async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+  const id = req.params.id;
 
+  // 🔒 STEP 1 — Basic validation
+  if (!currentPassword || !newPassword) {
+    return res.status(400).json({
+      message: "All fields are required"
+    });
+  }
+
+  // 🔒 STEP 2 — Length validation (ADD IT HERE)
+  if (newPassword.length < 6) {
+    return res.status(400).json({
+      message: "Password must be at least 6 characters"
+    });
+  }
+
+  try {
+    db.query("SELECT password FROM users WHERE id = ?", [id], async (err, results) => {
+      if (err) return res.status(500).json(err);
+
+      if (results.length === 0) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const user = results[0];
+
+      const isMatch = await bcrypt.compare(currentPassword, user.password);
+
+      if (!isMatch) {
+        return res.status(400).json({ message: "Current password incorrect" });
+      }
+
+      // 🔐 Now safe to hash
+      const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+      db.query(
+        "UPDATE users SET password = ? WHERE id = ?",
+        [hashedPassword, id],
+        (err2) => {
+          if (err2) return res.status(500).json(err2);
+
+          res.json({ message: "Password updated successfully" });
+        }
+      );
+    });
+  } catch (error) {
+    res.status(500).json(error);
+  }
+});
 
 module.exports = router;
